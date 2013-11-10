@@ -1,0 +1,58 @@
+#!/usr/bin/env python
+
+"""
+docluster
+
+do a shell command on every machine in a cluster
+
+Syntax:
+docluster [cluster id] [shell command]
+
+
+Depends on fabric and the novaclient library
+
+Problems:
+  - only works on sullivan for now.
+  - you have to be on the login node; there's probably
+    a way to make fabric work over two-hop ssh but I
+    have not yet bothered to figure it out.
+"""
+
+from fabric.api import *
+from fabric.tasks import execute
+from novaclient import client
+import sys
+import os
+
+# make a novaclient
+cs = client.Client('1.1',
+                   os.environ["OS_USERNAME"],
+                   os.environ["OS_PASSWORD"],
+                   os.environ["OS_TENANT_NAME"],
+                   os.environ["OS_AUTH_URL"],
+                   service_type='compute')
+
+def in_cluster(clust_id, name):
+    """Given a cluster id and the name of server, decide whether the
+    server is in the cluster or not"""
+    if (name == "torque-node-" + clust_id
+        or name == "torque-headnode-" + clust_id):
+        return True
+    else:
+        return False
+
+# get the ip addrs of the machines in this cluster
+clust_id = sys.argv[1] # the id of the cluster we are interested in
+addrs =[serv.addresses['private'][0]['addr']
+    for serv in cs.servers.list() if in_cluster(clust_id,serv.name)]
+
+# fabric stuff
+
+env.hosts = addrs
+env.user = "ubuntu"  # this will obviously only work on sully
+env.parallel = True
+
+def run_cmd():
+    run(" ".join(sys.argv[2:]))
+
+execute(run_cmd)
