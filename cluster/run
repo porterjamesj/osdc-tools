@@ -1,0 +1,30 @@
+#!/usr/bin/env python
+
+import subprocess
+import argparse
+from cluster_helper.cluster import cluster_view
+
+
+def run(cmd, filename):
+    subprocess.check_call("{cmd} {filename}".format(**locals()))
+
+
+def main(cmd, files, n):
+    with cluster_view(scheduler="torque", queue="batch", num_jobs=n) as view:
+        view.map(cmd, files)
+
+
+# ye old argparse incantations
+parser = argparse.ArgumentParser(
+    "Run a command on a list of files, distributed")
+
+parser.add_argument("-c", "--command", help="Command to be run.")
+parser.add_argument("-n", help="Number of parallel jobs.", type=int,
+                    default=1)
+parser.add_argument("files", help="list of files to run the command on.",
+                    nargs="*")
+
+if __name__ == "__main__":
+    args = parser.parse_args()
+    print args.command, args.n, args.files
+    main(args.cmd, args.files, args.n)
