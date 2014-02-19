@@ -1,30 +1,44 @@
 #!/usr/bin/env python
 
-import subprocess
 import argparse
-from cluster_helper.cluster import cluster_view
+import subprocess
+import os
 
+PBS_TEMPLATE = """
+#PBS
 
-def run(cmd, filename):
-    subprocess.check_call("{cmd} {filename}".format(**locals()))
+#PBS -N {file}
+
+#PBS -o {file}.o
+#PBS -e {file}.e
+
+#PBS -l nodes={n}
+#PBS -l walltime=239:00:00
+
+cd $PBS_O_WORKDIR
+
+{cmd} {file}
+"""
 
 
 def main(cmd, files, n):
-    with cluster_view(scheduler="torque", queue="batch", num_jobs=n) as view:
-        view.map(cmd, files)
-
+    for file in files:
+        basename = os.path.basename(file)
+        with open("{basename}.pbs".format(**locals()), "w") as pbs_script:
+            pbs_script.write(PBS_TEMPLATE.format(**locals()))
+            subprocess.Popen(["qsub",
+                              "{basename}.pbs".format(basename=basename)])
 
 # ye old argparse incantations
 parser = argparse.ArgumentParser(
     "Run a command on a list of files, distributed")
 
 parser.add_argument("-c", "--command", help="Command to be run.")
-parser.add_argument("-n", help="Number of parallel jobs.", type=int,
-                    default=1)
+parser.add_argument("-n", help="Nodes per job.", default=1)
 parser.add_argument("files", help="list of files to run the command on.",
                     nargs="*")
 
 if __name__ == "__main__":
     args = parser.parse_args()
-    print args.command, args.n, args.files
-    main(args.cmd, args.files, args.n)
+    # print args.command, args.n, args.files
+    main(args.command, args.files, args.n)
